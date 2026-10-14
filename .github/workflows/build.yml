@@ -70,83 +70,21 @@ jobs:
       shell: cmd
       run: build.bat
 
-    - name: Package build into 500MB split zip files
+    - name: Package build into single compressed release package
       shell: pwsh
       run: |
         $binDir = "build/port/bin"
-        $files = Get-ChildItem -LiteralPath $binDir
-        $partSize = 500MB
-        $partIndex = 1
-        $currentSize = 0
-        $currentFiles = @()
-        foreach ($f in $files) {
-          $currentFiles += $f.FullName
-          $currentSize += $f.Length
-          if ($currentSize -ge $partSize) {
-            $zipName = ("sotc_build_part_{0:D2}.zip" -f $partIndex)
-            Compress-Archive -Path $currentFiles -DestinationPath $zipName
-            Write-Host "Created $zipName ($currentSize bytes)"
-            $currentFiles = @()
-            $currentSize = 0
-            $partIndex++
-          }
-        }
-        if ($currentFiles.Count -gt 0) {
-          $zipName = ("sotc_build_part_{0:D2}.zip" -f $partIndex)
-          Compress-Archive -Path $currentFiles -DestinationPath $zipName
-          Write-Host "Created $zipName ($currentSize bytes)"
-        }
+        $zipName = "sotc_build_release.zip"
+        $files = Get-ChildItem -LiteralPath $binDir -Recurse
+        Compress-Archive -Path $files.FullName -DestinationPath $zipName -CompressionLevel Optimal
+        $size = (Get-Item $zipName).Length
+        Write-Host "Created $zipName ($size bytes)"
 
-    - name: Upload split zip artifacts 01-05 individually
+    - name: Upload single release artifact
       uses: actions/upload-artifact@v4
       with:
-        name: sotc_build_part_01
-        path: sotc_build_part_01.zip
+        name: sotc_build_release
+        path: sotc_build_release.zip
         retention-days: 7
-        if-no-files-found: ignore
-      if: always()
-
-    - name: Upload split zip artifact 02
-      uses: actions/upload-artifact@v4
-      with:
-        name: sotc_build_part_02
-        path: sotc_build_part_02.zip
-        retention-days: 7
-        if-no-files-found: ignore
-      if: always()
-
-    - name: Upload split zip artifact 03
-      uses: actions/upload-artifact@v4
-      with:
-        name: sotc_build_part_03
-        path: sotc_build_part_03.zip
-        retention-days: 7
-        if-no-files-found: ignore
-      if: always()
-
-    - name: Upload split zip artifact 04
-      uses: actions/upload-artifact@v4
-      with:
-        name: sotc_build_part_04
-        path: sotc_build_part_04.zip
-        retention-days: 7
-        if-no-files-found: ignore
-      if: always()
-
-    - name: Upload split zip artifact 05
-      uses: actions/upload-artifact@v4
-      with:
-        name: sotc_build_part_05
-        path: sotc_build_part_05.zip
-        retention-days: 7
-        if-no-files-found: ignore
-      if: always()
-
-    - name: Upload remaining split zip artifacts (catch-all)
-      uses: actions/upload-artifact@v4
-      with:
-        name: sotc_build_remaining
-        path: sotc_build_part_*.zip
-        retention-days: 7
-        if-no-files-found: ignore
+        if-no-files-found: error
       if: always()
