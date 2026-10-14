@@ -32,11 +32,20 @@ jobs:
           exit 1
         }
 
-    - name: Setup VS Environment
-      shell: cmd
+    - name: Setup VS Environment (find via vswhere)
+      shell: pwsh
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-        echo VSROOT=%VSROOT% >> $env:GITHUB_ENV
+        $vsPath = (& "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath -prerelease | Select-Object -First 1).Trim()
+        if (-not $vsPath) { $vsPath = "C:\Program Files\Microsoft Visual Studio\18\Community" }
+        $env:VSROOT = $vsPath
+        $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvars64.bat"
+        if (Test-Path $vcvars) {
+          echo "Found VS at $vsPath"
+        } else {
+          Write-Host "Warning: $vcvars not found; will rely on actions preinstalled VS"
+        }
+        # Write env for following steps
+        "VSROOT=$vsPath" | Out-File -FilePath $env:GITHUB_ENV -Append
 
     - name: Configure
       shell: cmd
