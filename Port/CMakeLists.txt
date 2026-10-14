@@ -8,6 +8,9 @@ endif()
 
 file(GLOB SOTC_GENERATED_SOURCES CONFIGURE_DEPENDS "${SOTC_GENERATED_DIR}/*.cpp")
 
+# Override optimization for register_functions.cpp specifically (fix C1002 heap space)
+set_source_files_properties("${SOTC_GENERATED_DIR}/register_functions.cpp" PROPERTIES COMPILE_OPTIONS "/Ob1")
+
 set(SOTC_HOST_SOURCES
     src/main.cpp
     src/sotc/config.cpp

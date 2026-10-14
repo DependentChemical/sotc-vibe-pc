@@ -1,0 +1,86 @@
+name: Build Shadow of the Colossus PC Port
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      VSROOT: C:\Program Files\Microsoft Visual Studio\2022\Community
+      SOTC_ISO: ${{ github.workspace }}\Game\SOTC.iso
+      PS2X_VU1_TIMING: 0
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Download ISO from archive.org
+      shell: bash
+      run: |
+        mkdir -p Game
+        curl -L -o Game/SOTC.iso "https://archive.org/download/shadow-of-the-colossus-box/SHADOW_COLOSSUS%20%28PAL%29.iso"
+
+    - name: Verify ISO hash
+      shell: pwsh
+      run: |
+        $hash = (Get-FileHash -Algorithm SHA256 Game/SOTC.iso).Hash
+        if ($hash -ne "068925770645266189005f09c9a9a1fee25726bfc93c89b12f832f3673664ac4") {
+          Write-Error "ISO hash mismatch"
+          exit 1
+        }
+
+    - name: Setup VS Environment
+      shell: cmd
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+        echo VSROOT=%VSROOT% >> $env:GITHUB_ENV
+
+    - name: Configure
+      shell: cmd
+      run: configure.bat
+
+    - name: Build ps2_recomp
+      shell: cmd
+      run: build.bat ps2_recomp
+
+    - name: Generate Game Code
+      shell: cmd
+      run: Tools\generate.bat
+
+    - name: Build Port
+      shell: cmd
+      run: build.bat
+
+    - name: Package build into 1GB split zip files
+      shell: pwsh
+      run: |
+        $binDir = "build/port/bin"
+        $files = Get-ChildItem -LiteralPath $binDir
+        $partSize = 1GB
+        $partIndex = 1
+        $currentSize = 0
+        $currentFiles = @()
+        foreach ($f in $files) {
+          $currentFiles += $f.FullName
+          $currentSize += $f.Length
+          if ($currentSize -ge $partSize) {
+            $zipName = "sotc_build_part_${partIndex:00}.zip"
+            Compress-Archive -Path $currentFiles -DestinationPath $zipName
+            Write-Host "Created $zipName ($currentSize bytes)"
+            $currentFiles = @()
+            $currentSize = 0
+            $partIndex++
+          }
+        }
+        if ($currentFiles.Count -gt 0) {
+          $zipName = "sotc_build_part_${partIndex:00}.zip"
+          Compress-Archive -Path $currentFiles -DestinationPath $zipName
+          Write-Host "Created $zipName ($currentSize bytes)"
+        }
+        # Upload artifacts
+        Get-ChildItem -Filter "*.zip" | ForEach-Object {
+          Write-Host "Artifact: $($_.Name) ($($_.Length) bytes)"
+        }
