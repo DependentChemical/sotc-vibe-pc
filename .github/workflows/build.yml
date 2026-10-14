@@ -47,6 +47,13 @@ jobs:
         # Write env for following steps
         "VSROOT=$vsPath" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+    - name: Create temporary generated files (for configure)
+      shell: pwsh
+      run: |
+        New-Item -Path "Port/generated/register_functions.cpp" -ItemType File -Force | Out-Null
+        New-Item -Path "Port/generated/sotc_layout_generated.h" -ItemType File -Force | Out-Null
+        Write-Host "Dummy files created"
+
     - name: Configure
       shell: cmd
       run: configure.bat
